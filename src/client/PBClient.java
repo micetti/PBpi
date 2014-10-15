@@ -1,4 +1,5 @@
 package client;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -45,31 +46,41 @@ public class PBClient {
      * 
      */
 	public PBClient() {
+
+		Handler handler;
 		try {
-			Props.read();
-		} catch (IOException e) {
+			// handler = new FileHandler("log.txt");
+			handler = new ConsoleHandler();
+			log.setUseParentHandlers(false);
+			log.setLevel(Level.FINEST);
+			handler.setLevel(Level.FINEST);
+			handler.setFormatter(new Formatter() {
+				public String format(LogRecord record) {
+					return "[" + record.getLevel() + "] "
+							+ record.getSourceClassName() + "."
+							+ record.getSourceMethodName() + " :: "
+							+ record.getMessage() + "\n";
+				}
+			});
+			log.addHandler(handler);
+			try {
+				Props.read();
+			} catch (IOException e) {
+				log.severe("Problems with reading Properties from general.properties");
+				e.printStackTrace();
+			}
+		} catch (SecurityException e1) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+			e1.printStackTrace();
+		} // catch (IOException e1) {
+			// // TODO Auto-generated catch block
+			// e1.printStackTrace();
+			// }
 		client = HttpClients.custom()
 				.setDefaultCredentialsProvider(credsProvider).build();
 		credsProvider.setCredentials(new AuthScope("api.pushbullet.com", 443),
 				new UsernamePasswordCredentials(Props.apiKey(), null));
-		
-		// Handler handler = new FileHandler( "log.txt" );
-		Handler handler = new ConsoleHandler();
-		log.setUseParentHandlers(false);
-		log.setLevel(Level.CONFIG);
-		handler.setLevel(Level.FINEST);
-		handler.setFormatter(new Formatter() {
-			public String format(LogRecord record) {
-				return "[" + record.getLevel() + "] "
-						+ record.getSourceClassName() + "."
-						+ record.getSourceMethodName() + " :: "
-						+ record.getMessage() + "\n";
-			}
-		});
-		log.addHandler(handler);
+
 	}
 
 	/**********************************************************************************************
@@ -143,9 +154,9 @@ public class PBClient {
 	}
 
 	/**********************************************************************************************
-	 * Method to fill the HashMap<String, String[]> "idenNick" with information
-	 * about all devices registered. Maybe change to Map<Map> to store more
-	 * information and make easier to access.
+	 * Method to fill the HashMap<String, HashMap<String, String> "idenNick"
+	 * with information about all devices registered. Currently every Nickname
+	 * is key to access a Hashmap with the two keys iden and created
 	 */
 	public void listAllDevices() throws ClientProtocolException, IOException {
 
@@ -166,7 +177,7 @@ public class PBClient {
 		Object obj = JSONValue.parse(jsonText);
 		JSONObject responseMap = (JSONObject) obj;
 		JSONArray devicesArray = (JSONArray) responseMap.get("devices");
-//		TODO: deviceArray may be null
+		// TODO: deviceArray may be null
 		log.config("Number of total Devices: " + devicesArray.size());
 
 		for (int i = 0; i < devicesArray.size(); i++) {
@@ -233,6 +244,15 @@ public class PBClient {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		try {
+			this.listAllDevices();
+		} catch (ClientProtocolException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	/**********************************************************************************************
@@ -252,6 +272,8 @@ public class PBClient {
 			nameValuePairs.add(new BasicNameValuePair("device_iden", iden));
 			nameValuePairs.add(new BasicNameValuePair("title", title));
 			nameValuePairs.add(new BasicNameValuePair("body", content));
+			nameValuePairs.add(new BasicNameValuePair("source_device_iden",
+					this.getIden(Props.deviceName())));
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
@@ -328,15 +350,19 @@ public class PBClient {
 
 	/**********************************************************************************************
 	 * Sets all pushes to "active":false.
+	 * @throws IOException 
+	 * @throws ClientProtocolException 
 	 */
-	public void cleanPushHistory() {
+	public void cleanPushHistory() throws ClientProtocolException, IOException {
 		int count = 0;
 		String jsonText = this.getAllPushes();
 		Object obj = JSONValue.parse(jsonText);
 		JSONArray pushArray = (JSONArray) obj;
 		log.config("Number of Pushes before clean up: " + pushArray.size());
+		JSONObject pushMap;
+		HttpResponse response;
 		for (int i = 0; i < pushArray.size(); i++) {
-			JSONObject pushMap = (JSONObject) pushArray.get(i);
+			pushMap = (JSONObject) pushArray.get(i);
 			log.finest("Push number " + i + ": " + pushMap.toString());
 			if (pushMap.get("active").toString().equals("false")) {
 				count++;
@@ -344,13 +370,11 @@ public class PBClient {
 			}
 			HttpDelete delete = new HttpDelete(Props.url() + "/pushes/"
 					+ pushMap.get("iden"));
-			try {
-				HttpResponse response = client.execute(delete);
+				log.finest("Trying to delete push with iden: "
+						+ pushMap.get("iden"));
+				response = client.execute(delete);
 				log.info("Deleting Push number " + (i + 1) + ": "
 						+ response.getStatusLine());
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
 		}
 		log.config("Number of Pushes which were not yet deleted: "
 				+ (pushArray.size() - count));
@@ -378,6 +402,9 @@ public class PBClient {
      * 
      */
 	public String getIden(String nick) {
+		if (!idenNick.containsKey(nick)) {
+			return null;
+		}
 		return idenNick.get(nick).get("iden");
 	}
 
@@ -385,6 +412,9 @@ public class PBClient {
      * 
      */
 	public String getTimeStamp(String nick) {
+		if (!idenNick.containsKey(nick)) {
+			return null;
+		}
 		return idenNick.get(nick).get("created");
 	}
 

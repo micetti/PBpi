@@ -14,13 +14,17 @@ public class Props {
 	}
 
 	public static String apiKey() {
-		return properties.getProperty("api_key");
+		return properties.getProperty("apiKey");
+	}
+	
+	public static String deviceName() {
+		return properties.getProperty("deviceName");
 	}
 
 	public static void read() throws IOException {
 		BufferedInputStream stream;
 		stream = new BufferedInputStream(new FileInputStream(
-				"src/general.properties"));
+				"./general.properties"));
 		properties.load(stream);
 		stream.close();
 
