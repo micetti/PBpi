@@ -53,15 +53,15 @@ public class Main {
 			client.deleteDevice(client.getIden(Props.deviceName()));
 		}
 		client.addDevice(Props.deviceName());
-		try {
-			client.cleanPushHistory();
-		} catch (ClientProtocolException e) {
-			System.out.println("ClientProtocolException");
-			e.printStackTrace();
-		} catch (IOException e) {
-			System.out.println("IOException");
-			e.printStackTrace();
-		}
+//		try {
+//			client.cleanPushHistory();
+//		} catch (ClientProtocolException e) {
+//			System.out.println("ClientProtocolException");
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			System.out.println("IOException");
+//			e.printStackTrace();
+//		}
 		while (true) {
 			client.push("PiTestTime", "Uptime: "
 					+ (System.currentTimeMillis() - start) / 1000 + "seconds",

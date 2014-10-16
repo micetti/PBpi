@@ -349,38 +349,6 @@ public class PBClient {
 	}
 
 	/**********************************************************************************************
-	 * Sets all pushes to "active":false.
-	 * @throws IOException 
-	 * @throws ClientProtocolException 
-	 */
-	public void cleanPushHistory() throws ClientProtocolException, IOException {
-		int count = 0;
-		String jsonText = this.getAllPushes();
-		Object obj = JSONValue.parse(jsonText);
-		JSONArray pushArray = (JSONArray) obj;
-		log.config("Number of Pushes before clean up: " + pushArray.size());
-		JSONObject pushMap;
-		HttpResponse response;
-		for (int i = 0; i < pushArray.size(); i++) {
-			pushMap = (JSONObject) pushArray.get(i);
-			log.finest("Push number " + i + ": " + pushMap.toString());
-			if (pushMap.get("active").toString().equals("false")) {
-				count++;
-				continue;
-			}
-			HttpDelete delete = new HttpDelete(Props.url() + "/pushes/"
-					+ pushMap.get("iden"));
-				log.finest("Trying to delete push with iden: "
-						+ pushMap.get("iden"));
-				response = client.execute(delete);
-				log.info("Deleting Push number " + (i + 1) + ": "
-						+ response.getStatusLine());
-		}
-		log.config("Number of Pushes which were not yet deleted: "
-				+ (pushArray.size() - count));
-	}
-
-	/**********************************************************************************************
 	 * Changes the String notation of the HTTPS timeStamps to according double
 	 * value.
 	 */
