@@ -12,30 +12,6 @@ public class Main {
 	public static void main(String[] args) throws InterruptedException {
 		long start = System.currentTimeMillis();
 
-//		Logger log = Logger.getLogger(PBClient.class.getName());
-//		Handler handler;
-//		try {
-//			// handler = new FileHandler("log.txt");
-//			handler = new ConsoleHandler();
-//			log.setUseParentHandlers(false);
-//			log.setLevel(Level.FINEST);
-//			handler.setLevel(Level.FINEST);
-//			handler.setFormatter(new Formatter() {
-//				public String format(LogRecord record) {
-//					return "[" + record.getLevel() + "] "
-//							+ record.getSourceClassName() + "."
-//							+ record.getSourceMethodName() + " :: "
-//							+ record.getMessage() + "\n";
-//				}
-//			});
-//		} catch (SecurityException e1) {
-//			// TODO Auto-generated catch block
-//			e1.printStackTrace();
-//		}// catch (IOException e1) {
-//			// TODO Auto-generated catch block
-//			e1.printStackTrace();
-//		}
-
 		PBClient client = new PBClient();
 		try {
 			client.listAllDevices();
@@ -53,20 +29,11 @@ public class Main {
 			client.deleteDevice(client.getIden(Props.deviceName()));
 		}
 		client.addDevice(Props.deviceName());
-//		try {
-//			client.cleanPushHistory();
-//		} catch (ClientProtocolException e) {
-//			System.out.println("ClientProtocolException");
-//			e.printStackTrace();
-//		} catch (IOException e) {
-//			System.out.println("IOException");
-//			e.printStackTrace();
-//		}
 		while (true) {
 			client.push("PiTestTime", "Uptime: "
 					+ (System.currentTimeMillis() - start) / 1000 + "seconds",
 					client.getIden("TestDevice"));
-			Thread.sleep(60);
+			Thread.sleep(60*60*15);
 		}
 	}
 

@@ -6,12 +6,6 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Formatter;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -33,54 +27,25 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
 import utils.Props;
+import utils.PushLogger;
 
 public class PBClient {
 
 	private CredentialsProvider credsProvider = new BasicCredentialsProvider();
 	private CloseableHttpClient client;
 	private HashMap<String, HashMap<String, String>> idenNick;
-	private static final Logger log = Logger
-			.getLogger(PBClient.class.getName());
+	static PushLogger logger;
 
 	/**********************************************************************************************
      * 
      */
 	public PBClient() {
-
-		Handler handler;
-		try {
-			// handler = new FileHandler("log.txt");
-			handler = new ConsoleHandler();
-			log.setUseParentHandlers(false);
-			log.setLevel(Level.FINEST);
-			handler.setLevel(Level.FINEST);
-			handler.setFormatter(new Formatter() {
-				public String format(LogRecord record) {
-					return "[" + record.getLevel() + "] "
-							+ record.getSourceClassName() + "."
-							+ record.getSourceMethodName() + " :: "
-							+ record.getMessage() + "\n";
-				}
-			});
-			log.addHandler(handler);
-			try {
-				Props.read();
-			} catch (IOException e) {
-				log.severe("Problems with reading Properties from general.properties");
-				e.printStackTrace();
-			}
-		} catch (SecurityException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} // catch (IOException e1) {
-			// // TODO Auto-generated catch block
-			// e1.printStackTrace();
-			// }
+		
+		logger = new PushLogger(Props.logLevel());
 		client = HttpClients.custom()
 				.setDefaultCredentialsProvider(credsProvider).build();
 		credsProvider.setCredentials(new AuthScope("api.pushbullet.com", 443),
 				new UsernamePasswordCredentials(Props.apiKey(), null));
-
 	}
 
 	/**********************************************************************************************
@@ -121,7 +86,7 @@ public class PBClient {
 	 * @return Returns all pushes as a String in JSON-style.
 	 */
 	public String getAllPushes(String timeStamp) {
-		log.config("Requesting all Pushes after timeStamp: "
+		logger.log(4, "Requesting all Pushes after timeStamp: "
 				+ toDouble(timeStamp));
 		HttpGet get = new HttpGet(Props.url() + "/pushes?modified_after="
 				+ toDouble(timeStamp));
@@ -148,7 +113,7 @@ public class PBClient {
 		Object obj = JSONValue.parse(jsonText);
 		JSONObject responseMap = (JSONObject) obj;
 		JSONArray pushArray = (JSONArray) responseMap.get("pushes");
-		log.config("The pushes found for the requested TimeStamp: "
+		logger.log(4, "The pushes found for the requested TimeStamp: "
 				+ pushArray.toString());
 		return pushArray.toString();
 	}
@@ -164,7 +129,7 @@ public class PBClient {
 		HttpGet get = new HttpGet(Props.url() + "/devices");
 		StringBuilder result = new StringBuilder();
 		CloseableHttpResponse response = client.execute(get);
-		log.info("Requesting all Devices : " + response.getStatusLine());
+		logger.log(5, "Requesting all Devices : " + response.getStatusLine());
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(
 				response.getEntity().getContent()))) {
 			for (String line; (line = br.readLine()) != null;) {
@@ -173,12 +138,12 @@ public class PBClient {
 			br.close();
 		}
 		String jsonText = result.toString();
-		log.finest("Response String of URL/Devices request :" + jsonText);
+		logger.log(1, "Response String of URL/Devices request :" + jsonText);
 		Object obj = JSONValue.parse(jsonText);
 		JSONObject responseMap = (JSONObject) obj;
 		JSONArray devicesArray = (JSONArray) responseMap.get("devices");
 		// TODO: deviceArray may be null
-		log.config("Number of total Devices: " + devicesArray.size());
+		logger.log(4, "Number of total Devices: " + devicesArray.size());
 
 		for (int i = 0; i < devicesArray.size(); i++) {
 			JSONObject deviceMap = (JSONObject) devicesArray.get(i);
@@ -216,7 +181,7 @@ public class PBClient {
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
-			log.info("Registering a Device: " + response.getStatusLine());
+			logger.log(5, "Registering a Device: " + response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
 				for (String line; (line = br.readLine()) != null;) {
@@ -240,7 +205,7 @@ public class PBClient {
 		HttpDelete delete = new HttpDelete(Props.url() + "/devices/" + iden);
 		try {
 			HttpResponse response = client.execute(delete);
-			log.info("Deleting a Device: " + response.getStatusLine());
+			logger.log(5, "Deleting a Device: " + response.getStatusLine());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -277,7 +242,7 @@ public class PBClient {
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
-			log.info("Pushing to device " + iden + ": "
+			logger.log(5, "Pushing to device " + iden + ": "
 					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
@@ -308,7 +273,7 @@ public class PBClient {
 		Object obj = JSONValue.parse(jsonText);
 		JSONArray pushArray = (JSONArray) obj;
 		ArrayList<JSONObject> resultList = new ArrayList<JSONObject>();
-		log.config("Number of Pushes after the requested timeStamp: "
+		logger.log(4, "Number of Pushes after the requested timeStamp: "
 				+ pushArray.size());
 		for (int i = 0; i < pushArray.size(); i++) {
 			JSONObject pushMap = (JSONObject) pushArray.get(i);
@@ -318,7 +283,7 @@ public class PBClient {
 					resultList.add((JSONObject) pushArray.get(i));
 				}
 			} else {
-				log.config(pushArray.get(i).toString().substring(0, 25)
+				logger.log(4, pushArray.get(i).toString().substring(0, 25)
 						+ " ...did not contain target_device_iden");
 			}
 		}
@@ -358,7 +323,7 @@ public class PBClient {
 		}
 		String[] numbers = string.split("e+");
 		if (numbers.length != 2) {
-			log.severe("ERROR with timestamp");
+			logger.log(7, "ERROR with timestamp");
 			return 0;
 		}
 		double number = Double.parseDouble(numbers[0]);

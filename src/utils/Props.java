@@ -20,6 +20,10 @@ public class Props {
 	public static String deviceName() {
 		return properties.getProperty("deviceName");
 	}
+	
+	public static int logLevel() {
+		return Integer.parseInt(properties.getProperty("logLevel"));
+	}
 
 	public static void read() throws IOException {
 		BufferedInputStream stream;
