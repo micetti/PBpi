@@ -1,39 +1,33 @@
 package main;
 
-import java.io.IOException;
-
-import org.apache.http.client.ClientProtocolException;
+import java.util.ArrayList;
 
 import utils.Props;
+import utils.PushEntry;
 import client.PBClient;
 
 public class Main {
 
-	public static void main(String[] args) throws InterruptedException {
-		long start = System.currentTimeMillis();
-
+	public static void main(String[] args) {
 		PBClient client = new PBClient();
-		try {
-			client.listAllDevices();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		client.listAllDevices();
 		if (client.getIden(Props.deviceName()) != null) {
-//			log.severe("A Device with name " + Props.deviceName()
-//					+ " is already in use. Delete first.");
-//			return;
 			client.deleteDevice(client.getIden(Props.deviceName()));
 		}
 		client.addDevice(Props.deviceName());
+//		logger.log(7, "Registered the Device " + Props.deviceName() + ". Now ready to echo Pushes!");
+		client.listAllDevices();
+		ArrayList<PushEntry> pushList;
 		while (true) {
-			client.push("PiTestTime", "Uptime: "
-					+ (System.currentTimeMillis() - start) / 1000 + "seconds",
-					client.getIden("TestDevice"));
-			Thread.sleep(60*60*15);
+			pushList = client.read(client.getIden(Props.deviceName()), client.getTimeStamp(Props.deviceName()));
+			if (pushList.size() != 0){
+				for (int i = 0; i < pushList.size(); i++) {
+//					client.push(pushList.get(i).title + "-ECHO", pushList.get(i).body, pushList.get(i).sourceDevice);
+				}
+				for (int i = 0; i < pushList.size(); i++) {
+					client.deletePush(pushList.get(i).pushIden);
+				}
+			}
 		}
 	}
 

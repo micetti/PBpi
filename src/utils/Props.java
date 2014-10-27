@@ -31,7 +31,6 @@ public class Props {
 				"./general.properties"));
 		properties.load(stream);
 		stream.close();
-
 	}
 
 }

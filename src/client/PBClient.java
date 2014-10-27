@@ -27,6 +27,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
 import utils.Props;
+import utils.PushEntry;
 import utils.PushLogger;
 
 public class PBClient {
@@ -41,11 +42,17 @@ public class PBClient {
      */
 	public PBClient() {
 		
+		try {
+			Props.read();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		logger = new PushLogger(Props.logLevel());
 		client = HttpClients.custom()
 				.setDefaultCredentialsProvider(credsProvider).build();
 		credsProvider.setCredentials(new AuthScope("api.pushbullet.com", 443),
 				new UsernamePasswordCredentials(Props.apiKey(), null));
+		logger.log(10, "Client ready!");
 	}
 
 	/**********************************************************************************************
@@ -123,19 +130,28 @@ public class PBClient {
 	 * with information about all devices registered. Currently every Nickname
 	 * is key to access a Hashmap with the two keys iden and created
 	 */
-	public void listAllDevices() throws ClientProtocolException, IOException {
-
+	public void listAllDevices() {
 		idenNick = new HashMap<String, HashMap<String, String>>();
 		HttpGet get = new HttpGet(Props.url() + "/devices");
 		StringBuilder result = new StringBuilder();
-		CloseableHttpResponse response = client.execute(get);
-		logger.log(5, "Requesting all Devices : " + response.getStatusLine());
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(
-				response.getEntity().getContent()))) {
-			for (String line; (line = br.readLine()) != null;) {
-				result.append(line);
+		CloseableHttpResponse response;
+		try {
+			response = client.execute(get);
+			logger.log(5,
+					"Requesting all Devices : " + response.getStatusLine());
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(
+					response.getEntity().getContent()))) {
+				for (String line; (line = br.readLine()) != null;) {
+					result.append(line);
+				}
+				br.close();
 			}
-			br.close();
+		} catch (ClientProtocolException e) {
+			logger.log(7, "ClientProtocolException while listing all Devices");
+			e.printStackTrace();
+		} catch (IOException e) {
+			logger.log(7, "IOException while listing all Devices");
+			e.printStackTrace();
 		}
 		String jsonText = result.toString();
 		logger.log(1, "Response String of URL/Devices request :" + jsonText);
@@ -209,15 +225,8 @@ public class PBClient {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		try {
-			this.listAllDevices();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		this.listAllDevices();
+
 	}
 
 	/**********************************************************************************************
@@ -225,24 +234,23 @@ public class PBClient {
 	 *            Titel of the push
 	 * @param content
 	 *            All Information that should be pushed.
-	 * @param iden
+	 * @param targetIden
 	 *            Unique number to identify the device this push should go to.
 	 */
-	public void push(String title, String content, String iden) {
+	public void push(String title, String content, String targetIden, String sourceIden) {
 		HttpPost post = new HttpPost(Props.url() + "/pushes");
 		StringBuilder result = new StringBuilder();
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<>(1);
 			nameValuePairs.add(new BasicNameValuePair("type", "note"));
-			nameValuePairs.add(new BasicNameValuePair("device_iden", iden));
+			nameValuePairs.add(new BasicNameValuePair("device_iden", targetIden));
 			nameValuePairs.add(new BasicNameValuePair("title", title));
 			nameValuePairs.add(new BasicNameValuePair("body", content));
-			nameValuePairs.add(new BasicNameValuePair("source_device_iden",
-					this.getIden(Props.deviceName())));
+			nameValuePairs.add(new BasicNameValuePair("source_device_iden", sourceIden));
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
-			logger.log(5, "Pushing to device " + iden + ": "
+			logger.log(5, "Pushing to device " + targetIden + ": "
 					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
@@ -265,14 +273,14 @@ public class PBClient {
 	 *            pushes.
 	 * @param timeStamp
 	 *            Show only pushes newer than "timeStamp" indicates.
-	 * @return Returns all pushes as String in JSON-style
+	 * @return Returns all pushes as ArrayList of PushEntry Objects
 	 */
-	public String read(String device_iden, String timeStamp) {
+	public ArrayList<PushEntry> read(String device_iden, String timeStamp) {
 		String jsonText = this.getAllPushes(timeStamp);
 		// System.out.println(jsonText);
 		Object obj = JSONValue.parse(jsonText);
 		JSONArray pushArray = (JSONArray) obj;
-		ArrayList<JSONObject> resultList = new ArrayList<JSONObject>();
+		ArrayList<PushEntry> resultList = new ArrayList<PushEntry>();
 		logger.log(4, "Number of Pushes after the requested timeStamp: "
 				+ pushArray.size());
 		for (int i = 0; i < pushArray.size(); i++) {
@@ -280,37 +288,47 @@ public class PBClient {
 			if (pushMap.containsKey("target_device_iden")) {
 				if (pushMap.get("target_device_iden").toString()
 						.equals(device_iden)) {
-					resultList.add((JSONObject) pushArray.get(i));
+					resultList
+							.add(new PushEntry((JSONObject) pushArray.get(i)));
 				}
 			} else {
 				logger.log(4, pushArray.get(i).toString().substring(0, 25)
 						+ " ...did not contain target_device_iden");
 			}
 		}
-		return resultList.toString();
+		return resultList;
 	}
 
 	/**********************************************************************************************
-	 * Method for reading all pushes for the specified device "iden"
+	 * Method for deleting one Push.
 	 * 
 	 * @param iden
-	 *            Unique number to identify which device wants to read it's
-	 *            pushes.
-	 * 
-	 * @return Returns all pushes as String in JSON-style
+	 *            specifies the push that should be deleted.
 	 */
-	public String read(String device_iden) {
-		String jsonText = this.getAllPushes();
-		Object obj = JSONValue.parse(jsonText);
-		JSONArray pushArray = (JSONArray) obj;
-		ArrayList<JSONObject> resultList = new ArrayList<JSONObject>();
-		for (int i = 0; i < pushArray.size(); i++) {
-			JSONObject pushMap = (JSONObject) pushArray.get(i);
-			if (pushMap.get("target_device_iden").toString() == device_iden) {
-				resultList.add((JSONObject) pushArray.get(i));
+	public void deletePush(String iden) {
+		logger.log(1, "Going to delete: " + iden);
+		HttpDelete delete = new HttpDelete(Props.url() + "/pushes/" + iden);
+		try {
+			logger.log(1, "...");
+			HttpResponse response = client.execute(delete);
+			logger.log(5, "Deleting a post: " + response.getStatusLine());
+			StringBuilder result = new StringBuilder();
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(
+					response.getEntity().getContent()))) {
+				for (String line; (line = br.readLine()) != null;) {
+					result.append(line);
+				}
+				br.close();
 			}
+			logger.log(1, "...");
+		} catch (ClientProtocolException e) {
+			logger.log(1, "ClientProtocolException");
+			e.printStackTrace();
+		} catch (IOException e) {
+			logger.log(1, "IOException");
+			e.printStackTrace();
 		}
-		return resultList.toString();
+		logger.log(1, "...and it's done");
 	}
 
 	/**********************************************************************************************
