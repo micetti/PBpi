@@ -2,33 +2,38 @@ package main;
 
 import java.util.ArrayList;
 
-import utils.Props;
 import utils.PushEntry;
-import client.PBClient;
+import client.PushbulletDevice;
 
 public class Main {
 
 	public static void main(String[] args) {
-		PBClient client = new PBClient();
-		client.listAllDevices();
-		if (client.getIden(Props.deviceName()) != null) {
-			client.deleteDevice(client.getIden(Props.deviceName()));
-		}
-		client.addDevice(Props.deviceName());
-//		logger.log(7, "Registered the Device " + Props.deviceName() + ". Now ready to echo Pushes!");
-		client.listAllDevices();
-		ArrayList<PushEntry> pushList;
+
+		ArrayList<PushEntry> pushList = new ArrayList<PushEntry>();
+		PushEntry pEntry;
+		PushbulletDevice repeater = new PushbulletDevice();
 		while (true) {
-			pushList = client.read(client.getIden(Props.deviceName()), client.getTimeStamp(Props.deviceName()));
-			if (pushList.size() != 0){
+			pushList = repeater.read();
+			if (pushList.size() > 0) {
 				for (int i = 0; i < pushList.size(); i++) {
-//					client.push(pushList.get(i).title + "-ECHO", pushList.get(i).body, pushList.get(i).sourceDevice);
+					pEntry = pushList.get(i);
+					repeater.deletePush(pEntry);
+					pEntry.targetDevice = pEntry.sourceDevice;
+					pEntry.sourceDevice = repeater.getIden();
+					pEntry.title = pEntry.title.concat(" -ECHO");
+					// TODO: only be temporary Hack for demo. push to "Chrome";
+					if (pEntry.targetDevice.equals("NA")) {
+						pEntry.targetDevice = "ujC6kIYE4xEsjzWIEVDzOK";
+					}
+					repeater.push(pEntry);
 				}
-				for (int i = 0; i < pushList.size(); i++) {
-					client.deletePush(pushList.get(i).pushIden);
-				}
+			}
+			try {
+				Thread.sleep(10000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 	}
-
 }

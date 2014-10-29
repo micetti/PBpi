@@ -1,4 +1,4 @@
-package utils;
+package client;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -25,58 +25,58 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
-public class PushLogger {
+import utils.DeviceEntry;
+import utils.Props;
+
+public class Logger {
 	private CredentialsProvider credsProvider = new BasicCredentialsProvider();
 	private CloseableHttpClient client;
-	private int logLevel;
-	private HashMap<String, HashMap<String, String>> idenNick;
-
-	/**********************************************************************************************
-	 * @param loggerlevel
-	 *            defines the level of the logger if a push has a lower level
-	 *            nothing will be pushed.
-	 */
-	public PushLogger(int loggerlevel) {
+	private HashMap<String, DeviceEntry> devicesMap;
+	private String pushIden;
+	private String nickName;
+	
+	public Logger(String nick) {
+		System.out.println("\n+++Starting Logger+++");
+		// Read the properties file.
 		try {
 			Props.read();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			System.out
+					.println("Constructor: Could not read properties file. IOException!");
 			e.printStackTrace();
 		}
+
+		// Create the HTTP client. The logger will not have a own Device. It
+		// depends on an existing Logger device for the Account
 		client = HttpClients.custom()
 				.setDefaultCredentialsProvider(credsProvider).build();
 		credsProvider.setCredentials(new AuthScope("api.pushbullet.com", 443),
 				new UsernamePasswordCredentials(Props.apiKey(), null));
-		logLevel = loggerlevel;
+		
 		listAllDevices();
-	}
-
-	/**********************************************************************************************
-	 * @param level
-	 *            the more important somesting is the higher level should be
-	 *            used. If level is below the level of the logger nothing will
-	 *            be pushed.
-	 */
-	public void log(int level, String msg) {
-		if (getIden("Logger") == null)
-			return;
-		if (level >= logLevel) {
-			push(Props.deviceName(), msg, getIden("Logger"));
-		}
+		if (devicesMap.containsKey("Logger")){
+			pushIden = devicesMap.get("Logger").iden;
+		} else if (devicesMap.containsKey("Chrome")) {
+			pushIden = devicesMap.get("Chrome").iden;
+		} else pushIden = "corrupted";
+		nickName = nick;
 	}
 	
+	
 	/**********************************************************************************************
-	 * Method to fill the HashMap<String, HashMap<String, String> "idenNick"
-	 * with information about all devices registered. Currently every Nickname
-	 * is key to access a Hashmap with the two keys iden and created
+	 * This will fill the global devicesMap with DeviceEntry-Objects
 	 */
-	public void listAllDevices() {
+	private void listAllDevices() {
+		devicesMap = new HashMap<String, DeviceEntry>();
 
-		idenNick = new HashMap<String, HashMap<String, String>>();
+		// Request for a list of all Devices in JSON.
 		HttpGet get = new HttpGet(Props.url() + "/devices");
 		StringBuilder result = new StringBuilder();
-		CloseableHttpResponse response;
 		try {
-			response = client.execute(get);
+			CloseableHttpResponse response = client.execute(get);
+			System.out.println("Requesting all Devices : "
+					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
 				for (String line; (line = br.readLine()) != null;) {
@@ -85,55 +85,49 @@ public class PushLogger {
 				br.close();
 			}
 		} catch (ClientProtocolException e) {
+			System.out
+					.println("listAllDevices: ClientProtocolException occured!");
 			e.printStackTrace();
 		} catch (IOException e) {
+			System.out.println("listAllDevices: IOException occured!");
 			e.printStackTrace();
 		}
+
+		// Now modify the JSON to fit the DeviceEntry-Object and insert them to
+		// the global devicesMap.
 		String jsonText = result.toString();
 		Object obj = JSONValue.parse(jsonText);
 		JSONObject responseMap = (JSONObject) obj;
 		JSONArray devicesArray = (JSONArray) responseMap.get("devices");
-		// TODO: deviceArray may be null
 		for (int i = 0; i < devicesArray.size(); i++) {
-			JSONObject deviceMap = (JSONObject) devicesArray.get(i);
-			if (deviceMap.containsKey("iden")
-					&& deviceMap.containsKey("nickname")) {
-				if (idenNick.containsKey(deviceMap.get("nickname"))) {
-					System.out
-							.println("ERROR: Two Devices with same Nickname... "
-									+ deviceMap.get("nickName"));
-					continue;
-				}
-				HashMap<String, String> valuePairs = new HashMap<String, String>();
-				valuePairs.put("iden", deviceMap.get("iden").toString());
-				valuePairs.put("created", deviceMap.get("created").toString());
-				idenNick.put(deviceMap.get("nickname").toString(), valuePairs);
+			JSONObject map = (JSONObject) devicesArray.get(i);
+			if (map.containsKey("nickname")) {
+				devicesMap.put(map.get("nickname").toString(), new DeviceEntry(
+						map));
 			}
 		}
 	}
 	
 	/**********************************************************************************************
-	 * @param titel
-	 *            Titel of the push
-	 * @param content
-	 *            All Information that should be pushed.
-	 * @param iden
-	 *            Unique number to identify the device this push should go to.
+	 * Log a line and send it to the Logger device.
+	 * 
+	 * @param pEnty
+	 *            PushEnty-Object containing all necessary information.
 	 */
-	public void push(String title, String content, String iden) {
+	public void log(String msg) {
 		HttpPost post = new HttpPost(Props.url() + "/pushes");
 		StringBuilder result = new StringBuilder();
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<>(1);
 			nameValuePairs.add(new BasicNameValuePair("type", "note"));
-			nameValuePairs.add(new BasicNameValuePair("device_iden", iden));
-			nameValuePairs.add(new BasicNameValuePair("title", title));
-			nameValuePairs.add(new BasicNameValuePair("body", content));
-			nameValuePairs.add(new BasicNameValuePair("source_device_iden",
-					this.getIden(Props.deviceName())));
+			nameValuePairs.add(new BasicNameValuePair("device_iden", pushIden));
+			nameValuePairs.add(new BasicNameValuePair("title", nickName));
+			nameValuePairs.add(new BasicNameValuePair("body", msg));
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
+			System.out.println("New Log Entry: "
+					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
 				for (String line; (line = br.readLine()) != null;) {
@@ -142,18 +136,8 @@ public class PushLogger {
 				br.close();
 			}
 		} catch (IOException e) {
+			System.out.println("push: IOException occured!");
 			e.printStackTrace();
 		}
 	}
-	
-	/**********************************************************************************************
-     * 
-     */
-	public String getIden(String nick) {
-		if (!idenNick.containsKey(nick)) {
-			return null;
-		}
-		return idenNick.get(nick).get("iden");
-	}
-	
 }
