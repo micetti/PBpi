@@ -12,7 +12,7 @@ public class PushEntry {
 
 	// TODO: could be empty
 	public PushEntry(JSONObject pushMap) {
-		if (pushMap.containsKey("titel")) {
+		if (pushMap.containsKey("title")) {
 			title = pushMap.get("title").toString();
 		} else {
 			title = "Push";

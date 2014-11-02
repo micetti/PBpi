@@ -1,6 +1,7 @@
 package client;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -35,18 +37,19 @@ public class PushbulletDevice {
 	private CloseableHttpClient client;
 	private DeviceEntry deviceProperties;
 	private HashMap<String, DeviceEntry> devicesMap;
+	private Logger logger;
 
 	public PushbulletDevice() {
-		System.out.println("\n+++Starting Constructor+++");
 		// Read the properties file.
 		try {
 			Props.read();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			System.out
-					.println("Constructor: Could not read properties file. IOException!");
+			logger.log("Constructor: Could not read properties file. IOException!");
 			e.printStackTrace();
 		}
+		logger = new Logger(Props.deviceName());
+		logger.log("\n+++Starting Constructor+++");
 
 		// Create the HTTP client. Every client will be linked to a
 		// device(name).
@@ -62,9 +65,9 @@ public class PushbulletDevice {
 		if (devicesMap.containsKey(Props.deviceName())) {
 			deleteDevice(devicesMap.get(Props.deviceName()).iden);
 		}
-		System.out.println();
+		// System.out.println();
 		addDevice();
-		System.out.println();
+		// System.out.println();
 		listAllDevices();
 		deviceProperties = devicesMap.get(Props.deviceName());
 	}
@@ -80,8 +83,7 @@ public class PushbulletDevice {
 		StringBuilder result = new StringBuilder();
 		try {
 			CloseableHttpResponse response = client.execute(get);
-			System.out.println("Requesting all Devices : "
-					+ response.getStatusLine());
+			logger.log("Requesting all Devices : " + response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
 				for (String line; (line = br.readLine()) != null;) {
@@ -90,11 +92,10 @@ public class PushbulletDevice {
 				br.close();
 			}
 		} catch (ClientProtocolException e) {
-			System.out
-					.println("listAllDevices: ClientProtocolException occured!");
+			logger.log("listAllDevices: ClientProtocolException occured!");
 			e.printStackTrace();
 		} catch (IOException e) {
-			System.out.println("listAllDevices: IOException occured!");
+			logger.log("listAllDevices: IOException occured!");
 			e.printStackTrace();
 		}
 
@@ -124,8 +125,7 @@ public class PushbulletDevice {
 		HttpDelete delete = new HttpDelete(Props.url() + "/devices/" + iden);
 		try {
 			HttpResponse response = client.execute(delete);
-			System.out
-					.println("Deleting a Device: " + response.getStatusLine());
+			logger.log("Deleting a Device: " + response.getStatusLine());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -150,7 +150,7 @@ public class PushbulletDevice {
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
-			System.out.println("Adding the device " + Props.deviceName() + ": "
+			logger.log("Adding the device " + Props.deviceName() + ": "
 					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
@@ -186,7 +186,7 @@ public class PushbulletDevice {
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
-			System.out.println("Pushing " + pEntry.title + " to target: "
+			logger.log("Pushing " + pEntry.title + " to target: "
 					+ response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
@@ -196,7 +196,7 @@ public class PushbulletDevice {
 				br.close();
 			}
 		} catch (IOException e) {
-			System.out.println("push: IOException occured!");
+			logger.log("push: IOException occured!");
 			e.printStackTrace();
 		}
 	}
@@ -212,9 +212,8 @@ public class PushbulletDevice {
 		StringBuilder result = new StringBuilder();
 		try {
 			CloseableHttpResponse response = client.execute(get);
-			System.out.println("Reading all pushes for "
-					+ deviceProperties.nickName + ": "
-					+ response.getStatusLine());
+			logger.log("Reading all pushes for " + deviceProperties.nickName
+					+ ": " + response.getStatusLine());
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
 				for (String line; (line = br.readLine()) != null;) {
@@ -223,10 +222,10 @@ public class PushbulletDevice {
 				br.close();
 			}
 		} catch (ClientProtocolException e) {
-			System.out.println("read: ClientProtocolException occured!");
+			logger.log("read: ClientProtocolException occured!");
 			e.printStackTrace();
 		} catch (IOException e) {
-			System.out.println("read: IOException occured!");
+			logger.log("read: IOException occured!");
 			e.printStackTrace();
 		}
 
@@ -250,8 +249,8 @@ public class PushbulletDevice {
 				+ pEntry.pushIden);
 		try {
 			HttpResponse response = client.execute(delete);
-			System.out.println("Deleting push with Titel <" + pEntry.title
-					+ ">: " + response.getStatusLine());
+			logger.log("Deleting push with Titel <" + pEntry.title + ">: "
+					+ response.getStatusLine());
 			StringBuilder result = new StringBuilder();
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(
 					response.getEntity().getContent()))) {
@@ -261,12 +260,60 @@ public class PushbulletDevice {
 				br.close();
 			}
 		} catch (ClientProtocolException e) {
-			System.out.println("deletePush: ClientProtocolException occured!");
+			logger.log("deletePush: ClientProtocolException occured!");
 			e.printStackTrace();
 		} catch (IOException e) {
-			System.out.println("deletePush: IOException occured!");
+			logger.log("deletePush: IOException occured!");
 			e.printStackTrace();
 		}
+	}
+
+	public String pushFile(File file) {
+		HttpPost post = new HttpPost(Props.url() + "/upload-request");
+		StringBuilder result = new StringBuilder();
+		String file_url = "";
+		try {
+			List<NameValuePair> nameValuePairs = new ArrayList<>(1);
+			nameValuePairs.add(new BasicNameValuePair("file_name", file.getName()));
+			nameValuePairs.add(new BasicNameValuePair("file_type", "image/jpeg"));
+			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+			HttpResponse response = client.execute(post);
+			logger.log("Pushing the File " + file.getName() + ": " + response);
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(
+					response.getEntity().getContent()))) {
+				for (String line; (line = br.readLine()) != null;) {
+					result.append(line);
+				}
+				br.close();
+			}
+			// We need information from the result String
+			String jsonText = result.toString();
+			Object obj = JSONValue.parse(jsonText);
+			JSONObject responseMap = (JSONObject) obj;
+			post = new HttpPost(responseMap.get("upload_url").toString());
+			file_url = responseMap.get("file_url").toString();
+			responseMap = (JSONObject) responseMap.get("data");
+			
+			// use that information to fill the required fields
+			MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+			builder.addTextBody("awsaccesskeyid", responseMap.get("awsaccesskeyid").toString());
+			builder.addTextBody("acl", responseMap.get("acl").toString());
+			builder.addTextBody("key", responseMap.get("key").toString());
+			builder.addTextBody("signature", responseMap.get("signature").toString());
+			builder.addTextBody("policy", responseMap.get("policy").toString());
+			builder.addTextBody("content-type", responseMap.get("content-type").toString());
+			builder.addBinaryBody("file", file);
+			post.setEntity(builder.build());
+			
+			HttpResponse fileResponse = client.execute(post);
+			logger.log("Pushing the File " + file.getName() + ": " + fileResponse);
+
+		} catch (IOException e) {
+			logger.log("pushFile : IOException occured");
+		}
+		return file_url;
+		
 	}
 
 	public String getNickname() {

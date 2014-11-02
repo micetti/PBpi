@@ -11,7 +11,7 @@ public class DeviceEntry {
 		nickName = deviceMap.get("nickname").toString();
 		created = Double.parseDouble(deviceMap.get("created").toString());
 		iden = deviceMap.get("iden").toString();
-		System.out.println("There is a Device-Object for " + nickName + "!");
+//		System.out.println("There is a Device-Object for " + nickName + "!");
 	}
 
 }
