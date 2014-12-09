@@ -5,7 +5,7 @@ The code can be used for communication on an arbitrary Java enabled programmable
 	PushbulletDevice myDevice = new PushbulletDevice();
 
 This will either represent a physical device in the digital space or it can be a digital device only, for example to provide a service like a logger. Every device registered to the service can be represented with the DeviceEntry Class. Every Note is represented as a PushEntry Objects. They have the following fields:
-```
+```java
 public class PushEntry {
 	public String title;		// String for the title.
 	public String body;			// String for the message.
@@ -58,7 +58,8 @@ myDevice.push(urlNote);
 
 Now a .jar file has to be created, to be deployed on the target machine. Located in the same folder as the archived Java program, there must be a "general.properties" named file containing information that will be read by the constructor. The file must contain three lines. URL is the url to version 2 of the used Pushbullet API. The ApiKey can be found at \url{https://www.pushbullet.com/} after log in, in the section "Account Settings". And the deviceName must be chosen unique for the project.
 
+```
 URL = https://api.pushbullet.com/v2
 apiKey = xXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxX
 deviceName = myDevice
-
+```
