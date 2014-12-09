@@ -244,6 +244,12 @@ public class PushbulletDevice {
 		return resultList;
 	}
 
+	/**********************************************************************************************
+	 * This deletes the specified pushEntry object from the Server
+	 * 
+	 * @param pEntry
+	 *            This is the entry that will be deleted from the server.
+	 */
 	public void deletePush(PushEntry pEntry) {
 		HttpDelete delete = new HttpDelete(Props.url() + "/pushes/"
 				+ pEntry.pushIden);
@@ -268,14 +274,66 @@ public class PushbulletDevice {
 		}
 	}
 
+	/**********************************************************************************************
+	 * Reads only Pushes targeted at all devices and returns all active pushes
+	 * as an ArrayList<PushEntry> this is only needed to read data from web
+	 * services
+	 */
+	public ArrayList<PushEntry> allRead() {
+		ArrayList<PushEntry> resultList = new ArrayList<PushEntry>();
+		HttpGet get = new HttpGet(Props.url() + "/pushes?modified_after=" + 0);
+		StringBuilder result = new StringBuilder();
+		try {
+			CloseableHttpResponse response = client.execute(get);
+			logger.log("Reading all pushes for " + deviceProperties.nickName
+					+ ": " + response.getStatusLine());
+			try (BufferedReader br = new BufferedReader(new InputStreamReader(
+					response.getEntity().getContent()))) {
+				for (String line; (line = br.readLine()) != null;) {
+					result.append(line);
+				}
+				br.close();
+			}
+		} catch (ClientProtocolException e) {
+			logger.log("read: ClientProtocolException occured!");
+			e.printStackTrace();
+		} catch (IOException e) {
+			logger.log("read: IOException occured!");
+			e.printStackTrace();
+		}
+
+		// Move wanted information to ArrayList<PushEntry>
+		String jsonText = result.toString();
+		Object obj = JSONValue.parse(jsonText);
+		JSONObject responseMap = (JSONObject) obj;
+		JSONArray devicesArray = (JSONArray) responseMap.get("pushes");
+		for (int i = 0; i < devicesArray.size(); i++) {
+			JSONObject map = (JSONObject) devicesArray.get(i);
+			if (map.containsKey("body")
+					&& !map.containsKey("target_device_iden")) {
+
+				resultList.add(new PushEntry(map));
+			}
+		}
+		return resultList;
+	}
+
+	/**********************************************************************************************
+	 * @return returns the url to the file as a string after succesfull upload
+	 *         of the file to the servers
+	 * @param file
+	 *            File object representation of the File that should be pushed
+	 */
 	public String pushFile(File file) {
 		HttpPost post = new HttpPost(Props.url() + "/upload-request");
 		StringBuilder result = new StringBuilder();
 		String file_url = "";
 		try {
 			List<NameValuePair> nameValuePairs = new ArrayList<>(1);
-			nameValuePairs.add(new BasicNameValuePair("file_name", file.getName()));
-			nameValuePairs.add(new BasicNameValuePair("file_type", "image/jpeg"));
+			nameValuePairs.add(new BasicNameValuePair("file_name", file
+					.getName()));
+			nameValuePairs
+					.add(new BasicNameValuePair("file_type", "image/jpeg"));
 			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
 
 			HttpResponse response = client.execute(post);
@@ -294,26 +352,30 @@ public class PushbulletDevice {
 			post = new HttpPost(responseMap.get("upload_url").toString());
 			file_url = responseMap.get("file_url").toString();
 			responseMap = (JSONObject) responseMap.get("data");
-			
+
 			// use that information to fill the required fields
 			MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-			builder.addTextBody("awsaccesskeyid", responseMap.get("awsaccesskeyid").toString());
+			builder.addTextBody("awsaccesskeyid",
+					responseMap.get("awsaccesskeyid").toString());
 			builder.addTextBody("acl", responseMap.get("acl").toString());
 			builder.addTextBody("key", responseMap.get("key").toString());
-			builder.addTextBody("signature", responseMap.get("signature").toString());
+			builder.addTextBody("signature", responseMap.get("signature")
+					.toString());
 			builder.addTextBody("policy", responseMap.get("policy").toString());
-			builder.addTextBody("content-type", responseMap.get("content-type").toString());
+			builder.addTextBody("content-type", responseMap.get("content-type")
+					.toString());
 			builder.addBinaryBody("file", file);
 			post.setEntity(builder.build());
-			
+
 			HttpResponse fileResponse = client.execute(post);
-			logger.log("Pushing the File " + file.getName() + ": " + fileResponse);
+			logger.log("Pushing the File " + file.getName() + ": "
+					+ fileResponse);
 
 		} catch (IOException e) {
 			logger.log("pushFile : IOException occured");
 		}
 		return file_url;
-		
+
 	}
 
 	public String getNickname() {
@@ -326,6 +388,11 @@ public class PushbulletDevice {
 
 	public String getIden() {
 		return deviceProperties.iden;
+	}
+
+	public DeviceEntry getDeviceEntry(String nick) {
+		listAllDevices();
+		return devicesMap.get(nick);
 	}
 
 }

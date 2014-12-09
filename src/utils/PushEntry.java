@@ -27,7 +27,10 @@ public class PushEntry {
 		} else {
 			sourceDevice = "NA";
 		}
-		targetDevice = pushMap.get("target_device_iden").toString();
+		// could be a push targeted at all devices
+		if (!pushMap.containsKey("target_device_iden")){
+			targetDevice = "all";
+		} else {targetDevice = pushMap.get("target_device_iden").toString();}
 	}
 
 	/**********************************************************************************************
