@@ -16,7 +16,7 @@ public class PushEntry {
 }
 ```
 
-```
+```java
 public class DeviceEntry {
 	public String nickName;		// Unique nickname.
 	public double created;		// Unix-time, moment of creation.
