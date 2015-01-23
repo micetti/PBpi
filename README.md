@@ -1,6 +1,8 @@
 jPushbulletIoT
 ==============
 
+Author: Michael Petretti, University of Aberdeen, Scotland, 2014
+
 For in detail description see : https://www.dropbox.com/s/svu742akyx26xat/Thesis.pdf?dl=0
 
 The code can be used for communication on an arbitrary Java enabled programmable platform. First an object of the PushbulletDevice Class has to be created, which will register the device to the service.
