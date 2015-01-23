@@ -1,5 +1,8 @@
 jPushbulletIoT
 ==============
+
+For in detail description see : https://www.dropbox.com/sh/z10c3ugzefy1kwf/AAC6CoNvBtSrqKd7YnT33AK3a?dl=0
+
 The code can be used for communication on an arbitrary Java enabled programmable platform. First an object of the PushbulletDevice Class has to be created, which will register the device to the service.
 
 	PushbulletDevice myDevice = new PushbulletDevice();
